@@ -1,19 +1,19 @@
 import { useState, useEffect } from "react";
-import { X } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient } from "@/lib/queryClient";
-import { apiRequest } from "@/lib/queryClient";
+import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
-import { Class, InsertAttendance } from "@shared/schema";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { Class } from "@shared/schema";
+
 import {
   Dialog,
   DialogContent,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Calendar } from "@/components/ui/calendar";
 import {
   Select,
   SelectContent,
@@ -21,14 +21,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { CalendarIcon, CheckCircle2, XCircle, Clock, AlertCircle } from "lucide-react";
 
 interface AttendanceModalProps {
   isOpen: boolean;
@@ -36,208 +33,293 @@ interface AttendanceModalProps {
   classData: Class;
 }
 
+interface Student {
+  id: number;
+  name: string;
+  username: string;
+}
+
+interface AttendanceRecord {
+  studentId: number;
+  status: "present" | "absent" | "late" | "excused";
+  comment: string | null;
+}
+
 const AttendanceModal = ({ isOpen, onClose, classData }: AttendanceModalProps) => {
   const { toast } = useToast();
-  const [attendanceDate, setAttendanceDate] = useState<string>(
-    new Date().toISOString().split("T")[0]
-  );
-  const [attendanceRecords, setAttendanceRecords] = useState<Record<number, {
-    status: "present" | "absent" | "late" | "excused";
-    comment: string;
-  }>>({});
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [attendanceRecords, setAttendanceRecords] = useState<Map<number, AttendanceRecord>>(new Map());
+  const [activeTab, setActiveTab] = useState("take-attendance");
 
+  // Fetch students in this class
   const { data: students, isLoading: isLoadingStudents } = useQuery({
-    queryKey: [`/api/classes/${classData.id}/students`],
-    queryFn: () => fetch(`/api/classes/${classData.id}/students`).then((res) => res.json()),
-    enabled: isOpen && !!classData.id,
-  });
-
-  const { data: existingAttendance, isLoading: isLoadingAttendance } = useQuery({
-    queryKey: [`/api/classes/${classData.id}/attendance`, attendanceDate],
+    queryKey: ['/api/classes', classData?.id, 'students'],
     queryFn: () => 
-      fetch(`/api/classes/${classData.id}/attendance?date=${attendanceDate}`)
-        .then((res) => res.json()),
-    enabled: isOpen && !!classData.id && !!attendanceDate,
+      fetch(`/api/classes/${classData?.id}/students`)
+      .then(res => {
+        if (!res.ok) throw new Error("Failed to load students");
+        return res.json();
+      }),
+    enabled: isOpen && !!classData,
   });
 
-  useEffect(() => {
-    // Initialize or update attendance records when attendance data is loaded
-    if (students && (!isLoadingAttendance || existingAttendance)) {
-      const newRecords: Record<number, { status: "present" | "absent" | "late" | "excused"; comment: string }> = {};
-      
-      students.forEach((student: any) => {
-        // Find existing attendance for this student
-        const existing = existingAttendance?.find(
-          (a: any) => a.studentId === student.id
-        );
-        
-        newRecords[student.id] = {
-          status: existing?.status || "present",
-          comment: existing?.comment || "",
-        };
-      });
-      
-      setAttendanceRecords(newRecords);
-    }
-  }, [students, existingAttendance, isLoadingAttendance]);
+  // Fetch existing attendance records for this date
+  const { data: existingAttendance, isLoading: isLoadingAttendance, refetch: refetchAttendance } = useQuery({
+    queryKey: ['/api/classes', classData?.id, 'attendance', selectedDate.toISOString()],
+    queryFn: () => 
+      fetch(`/api/classes/${classData?.id}/attendance?date=${selectedDate.toISOString()}`)
+      .then(res => {
+        if (!res.ok) throw new Error("Failed to load attendance records");
+        return res.json();
+      }),
+    enabled: isOpen && !!classData,
+  });
 
-  const handleQuickSet = (status: "present" | "absent" | "late" | "excused") => {
+  // Initialize attendance records on data load or date change
+  useEffect(() => {
     if (!students) return;
+
+    const newRecords = new Map<number, AttendanceRecord>();
     
-    const newRecords = { ...attendanceRecords };
-    students.forEach((student: any) => {
-      newRecords[student.id] = {
-        ...newRecords[student.id],
-        status,
-      };
+    // First set default values
+    students.forEach((student: Student) => {
+      newRecords.set(student.id, {
+        studentId: student.id,
+        status: "present",
+        comment: null
+      });
     });
     
+    // Then override with existing values if available
+    if (existingAttendance && existingAttendance.length > 0) {
+      existingAttendance.forEach((record: any) => {
+        if (newRecords.has(record.studentId)) {
+          newRecords.set(record.studentId, {
+            studentId: record.studentId,
+            status: record.status,
+            comment: record.comment
+          });
+        }
+      });
+    }
+    
     setAttendanceRecords(newRecords);
+  }, [students, existingAttendance]);
+
+  // Update attendance status for a student
+  const handleStatusChange = (studentId: number, status: "present" | "absent" | "late" | "excused") => {
+    const updatedRecords = new Map(attendanceRecords);
+    const existingRecord = updatedRecords.get(studentId);
+    
+    if (existingRecord) {
+      updatedRecords.set(studentId, { ...existingRecord, status });
+      setAttendanceRecords(updatedRecords);
+    }
   };
 
+  // Update comment for a student
+  const handleCommentChange = (studentId: number, comment: string) => {
+    const updatedRecords = new Map(attendanceRecords);
+    const existingRecord = updatedRecords.get(studentId);
+    
+    if (existingRecord) {
+      updatedRecords.set(studentId, { ...existingRecord, comment });
+      setAttendanceRecords(updatedRecords);
+    }
+  };
+
+  // Save attendance records
   const saveAttendanceMutation = useMutation({
-    mutationFn: (records: InsertAttendance[]) => {
+    mutationFn: (records: any[]) => {
       return apiRequest("POST", "/api/attendance/bulk", { records });
     },
     onSuccess: () => {
       toast({
         title: "Attendance saved",
-        description: "Attendance records have been updated",
+        description: `Attendance records for ${format(selectedDate, "MMMM d, yyyy")} have been saved.`,
       });
-      queryClient.invalidateQueries({ 
-        queryKey: [`/api/classes/${classData.id}/attendance`]
-      });
-      onClose();
+      queryClient.invalidateQueries({ queryKey: ['/api/classes', classData?.id, 'attendance'] });
+      refetchAttendance();
     },
     onError: (error) => {
       toast({
         title: "Error",
-        description: error.message || "Failed to save attendance",
+        description: error instanceof Error ? error.message : "Failed to save attendance",
         variant: "destructive",
       });
     },
   });
 
   const handleSaveAttendance = () => {
-    if (!students) return;
-    
-    const records = students.map((student: any) => ({
+    const records = Array.from(attendanceRecords.values()).map(record => ({
+      ...record,
       classId: classData.id,
-      studentId: student.id,
-      date: new Date(attendanceDate),
-      status: attendanceRecords[student.id]?.status || "present",
-      comment: attendanceRecords[student.id]?.comment || "",
+      date: selectedDate
     }));
     
     saveAttendanceMutation.mutate(records);
   };
 
+  const handleDateChange = (date: Date | undefined) => {
+    if (date) {
+      setSelectedDate(date);
+    }
+  };
+
+  // Get status icons and colors
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case "present":
+        return <CheckCircle2 className="h-5 w-5 text-green-500" />;
+      case "absent":
+        return <XCircle className="h-5 w-5 text-red-500" />;
+      case "late":
+        return <Clock className="h-5 w-5 text-amber-500" />;
+      case "excused":
+        return <AlertCircle className="h-5 w-5 text-blue-500" />;
+      default:
+        return null;
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "present":
+        return "text-green-500";
+      case "absent":
+        return "text-red-500";
+      case "late":
+        return "text-amber-500";
+      case "excused":
+        return "text-blue-500";
+      default:
+        return "";
+    }
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto">
+      <DialogContent className="sm:max-w-[700px] max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex justify-between items-center">
-            <span>Attendance: {classData.name}</span>
-          </DialogTitle>
+          <DialogTitle>Attendance for {classData?.name}</DialogTitle>
         </DialogHeader>
-
-        <div className="p-1">
-          <div className="mb-6 flex flex-wrap items-center gap-4">
-            <div>
-              <label htmlFor="attendanceDate" className="block text-gray-600 mb-2">Date</label>
-              <Input
-                type="date"
-                id="attendanceDate"
-                value={attendanceDate}
-                onChange={(e) => setAttendanceDate(e.target.value)}
-              />
-            </div>
-            
-            <div>
-              <label htmlFor="attendanceStatus" className="block text-gray-600 mb-2">Quick Set</label>
-              <Select onValueChange={(value: "present" | "absent" | "late" | "excused") => handleQuickSet(value)}>
-                <SelectTrigger id="attendanceStatus" className="w-[180px]">
-                  <SelectValue placeholder="Select status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="present">Mark All Present</SelectItem>
-                  <SelectItem value="absent">Mark All Absent</SelectItem>
-                  <SelectItem value="late">Mark All Late</SelectItem>
-                  <SelectItem value="excused">Mark All Excused</SelectItem>
-                </SelectContent>
-              </Select>
+        
+        <div className="flex justify-between items-center mb-4">
+          <div className="grid gap-1">
+            <Label>Date</Label>
+            <div className="flex items-center">
+              <CalendarIcon className="mr-2 h-4 w-4 opacity-50" />
+              <span>{format(selectedDate, "MMMM d, yyyy")}</span>
             </div>
           </div>
+          <Calendar
+            mode="single"
+            selected={selectedDate}
+            onSelect={handleDateChange}
+            className="border rounded-md p-3"
+          />
+        </div>
+        
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="mb-4">
+            <TabsTrigger value="take-attendance">Take Attendance</TabsTrigger>
+            <TabsTrigger value="view-summary">Summary</TabsTrigger>
+          </TabsList>
           
-          {isLoadingStudents ? (
-            <div className="text-center py-4">Loading students...</div>
-          ) : students?.length > 0 ? (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-gray-100">
-                    <TableHead>Student Name</TableHead>
-                    <TableHead>Student ID</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Comments</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {students.map((student: any) => (
-                    <TableRow key={student.id} className="border-b border-gray-200">
-                      <TableCell>{student.name}</TableCell>
-                      <TableCell>ST-{student.id}</TableCell>
-                      <TableCell>
-                        <Select
-                          value={attendanceRecords[student.id]?.status || "present"}
-                          onValueChange={(value: "present" | "absent" | "late" | "excused") => {
-                            setAttendanceRecords({
-                              ...attendanceRecords,
-                              [student.id]: {
-                                ...attendanceRecords[student.id],
-                                status: value,
-                              },
-                            });
-                          }}
+          <TabsContent value="take-attendance">
+            {isLoadingStudents || isLoadingAttendance ? (
+              <div className="text-center py-8">Loading students...</div>
+            ) : students && students.length > 0 ? (
+              <div className="space-y-4">
+                {students.map((student: Student) => {
+                  const attendanceRecord = attendanceRecords.get(student.id);
+                  
+                  return (
+                    <div key={student.id} className="p-4 border rounded-lg">
+                      <div className="flex justify-between mb-3">
+                        <div>
+                          <h4 className="font-medium">{student.name}</h4>
+                          <p className="text-sm text-gray-500">{student.username}</p>
+                        </div>
+                        <Select 
+                          value={attendanceRecord?.status || "present"}
+                          onValueChange={(value) => handleStatusChange(
+                            student.id, 
+                            value as "present" | "absent" | "late" | "excused"
+                          )}
                         >
-                          <SelectTrigger className="w-full">
-                            <SelectValue />
+                          <SelectTrigger className="w-[140px]">
+                            <SelectValue placeholder="Status" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="present">Present</SelectItem>
-                            <SelectItem value="absent">Absent</SelectItem>
-                            <SelectItem value="late">Late</SelectItem>
-                            <SelectItem value="excused">Excused</SelectItem>
+                            <SelectItem value="present" className="text-green-500">Present</SelectItem>
+                            <SelectItem value="absent" className="text-red-500">Absent</SelectItem>
+                            <SelectItem value="late" className="text-amber-500">Late</SelectItem>
+                            <SelectItem value="excused" className="text-blue-500">Excused</SelectItem>
                           </SelectContent>
                         </Select>
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          value={attendanceRecords[student.id]?.comment || ""}
-                          placeholder="Optional comment"
-                          onChange={(e) => {
-                            setAttendanceRecords({
-                              ...attendanceRecords,
-                              [student.id]: {
-                                ...attendanceRecords[student.id],
-                                comment: e.target.value,
-                              },
-                            });
-                          }}
-                        />
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          ) : (
-            <div className="text-center py-4">No students enrolled in this class.</div>
-          )}
-        </div>
-
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
+                      </div>
+                      
+                      <Textarea
+                        placeholder="Add a comment (optional)"
+                        value={attendanceRecord?.comment || ""}
+                        onChange={(e) => handleCommentChange(student.id, e.target.value)}
+                        className="h-20"
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                No students enrolled in this class yet.
+              </div>
+            )}
+          </TabsContent>
+          
+          <TabsContent value="view-summary">
+            {isLoadingStudents || isLoadingAttendance ? (
+              <div className="text-center py-8">Loading attendance data...</div>
+            ) : students && students.length > 0 ? (
+              <div className="space-y-2">
+                <div className="grid grid-cols-4 gap-2 mb-2 font-medium">
+                  <div>Student</div>
+                  <div>Status</div>
+                  <div className="col-span-2">Comment</div>
+                </div>
+                
+                {students.map((student: Student) => {
+                  const record = attendanceRecords.get(student.id);
+                  
+                  return (
+                    <div key={student.id} className="grid grid-cols-4 gap-2 py-2 border-b">
+                      <div>{student.name}</div>
+                      <div className="flex items-center">
+                        {getStatusIcon(record?.status || "present")}
+                        <span className={`ml-1 ${getStatusColor(record?.status || "present")}`}>
+                          {record?.status.charAt(0).toUpperCase() + record?.status.slice(1)}
+                        </span>
+                      </div>
+                      <div className="col-span-2 text-gray-600 text-sm">
+                        {record?.comment || "-"}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                No attendance records to display.
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
+        
+        <DialogFooter className="mt-6">
+          <Button 
+            variant="outline" 
+            onClick={onClose}
+          >
             Cancel
           </Button>
           <Button 

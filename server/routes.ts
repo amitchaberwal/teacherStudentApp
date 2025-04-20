@@ -10,7 +10,8 @@ import {
   insertAssessmentSchema,
   insertGradeSchema,
   classCodeSchema,
-  loginSchema
+  loginSchema,
+  InsertClass
 } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -214,7 +215,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const teacher = await storage.getUser(classRecord.teacherId);
           
           // Get attendance stats
-          const attendanceRecords = await storage.getAttendanceByStudent(studentId, classRecord.classId);
+          const attendanceRecords = await storage.getAttendanceByStudent(studentId, classRecord.id);
           const totalRecords = attendanceRecords.length;
           let presentCount = 0;
           
@@ -225,7 +226,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const attendanceRate = totalRecords > 0 ? Math.round((presentCount / totalRecords) * 100) : 0;
           
           // Get grades
-          const grades = await storage.getGradesByStudent(studentId, classRecord.classId);
+          const grades = await storage.getGradesByStudent(studentId, classRecord.id);
           let totalScore = 0;
           grades.forEach(grade => totalScore += grade.score);
           const averageGrade = grades.length > 0 ? (totalScore / grades.length).toFixed(1) : 'N/A';

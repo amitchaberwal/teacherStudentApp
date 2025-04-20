@@ -1,17 +1,29 @@
 import { useState, useRef } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "../../hooks/use-auth";
 import { useLocation } from "wouter";
-import { Copy, MoreVertical, Plus, Search, Users, Edit, Trash } from "lucide-react";
+import { Copy, MoreVertical, Plus, Search, Users, Edit, Trash, AlertCircle } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import CreateClass from "./create-class";
 import AttendanceModal from "./attendance-modal";
 import GradesModal from "./grades-modal";
+import EditClassModal from "./edit-class-modal";
 import { Class } from "@shared/schema";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,9 +40,12 @@ const TeacherDashboard = () => {
   const [selectedClass, setSelectedClass] = useState<Class | null>(null);
   const [isAttendanceModalOpen, setIsAttendanceModalOpen] = useState(false);
   const [isGradesModalOpen, setIsGradesModalOpen] = useState(false);
-  const [isManageModalOpen, setIsManageModalOpen] = useState(false);
+  const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [classToDelete, setClassToDelete] = useState<Class | null>(null);
+  const [classToEdit, setClassToEdit] = useState<Class | null>(null);
 
-  const { data: classes, isLoading, error } = useQuery({
+  const { data: classes, isLoading, error, refetch } = useQuery({
     queryKey: ['/api/classes', user?.id],
     queryFn: () => 
       fetch(`/api/classes?teacherId=${user?.id}`).then((res) => {
@@ -38,6 +53,29 @@ const TeacherDashboard = () => {
         return res.json();
       }),
     enabled: !!user?.id,
+  });
+
+  // Delete class mutation
+  const deleteClassMutation = useMutation({
+    mutationFn: (classId: number) => {
+      return apiRequest("DELETE", `/api/classes/${classId}`);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Class deleted",
+        description: "The class has been successfully deleted",
+      });
+      // Invalidate and refetch
+      queryClient.invalidateQueries({ queryKey: ['/api/classes', user?.id] });
+      refetch();
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to delete class",
+        variant: "destructive",
+      });
+    },
   });
 
   const handleCopyClassCode = (classCode: string) => {
@@ -68,20 +106,25 @@ const TeacherDashboard = () => {
   };
 
   const handleEditClass = (classItem: Class) => {
+    setClassToEdit(classItem);
+    setIsEditModalOpen(true);
     toast({
       title: "Edit Class",
-      description: `Editing ${classItem.name}`,
+      description: `You can now edit ${classItem.name}`,
     });
-    // Future functionality: Open edit modal or navigate to edit page
   };
 
   const handleDeleteClass = (classItem: Class) => {
-    toast({
-      title: "Delete Class",
-      description: `This would delete ${classItem.name}`,
-      variant: "destructive",
-    });
-    // Future functionality: Show confirmation dialog and delete the class
+    setClassToDelete(classItem);
+    setIsDeleteAlertOpen(true);
+  };
+
+  const confirmDeleteClass = () => {
+    if (classToDelete) {
+      deleteClassMutation.mutate(classToDelete.id);
+      setIsDeleteAlertOpen(false);
+      setClassToDelete(null);
+    }
   };
 
   const filteredClasses = classes?.filter((classItem: Class) => 
@@ -235,6 +278,54 @@ const TeacherDashboard = () => {
             classData={selectedClass} 
           />
         </>
+      )}
+      
+      {/* Delete class confirmation dialog */}
+      <AlertDialog open={isDeleteAlertOpen} onOpenChange={setIsDeleteAlertOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center">
+              <AlertCircle className="h-5 w-5 mr-2 text-destructive" />
+              Delete Class
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {classToDelete && (
+                <>
+                  Are you sure you want to delete <strong>{classToDelete.name}</strong>? This action cannot be undone
+                  and all associated data including enrollments, attendance records, and grades will be permanently deleted.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              onClick={() => {
+                setClassToDelete(null);
+                setIsDeleteAlertOpen(false);
+              }}
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeleteClass}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteClassMutation.isPending ? "Deleting..." : "Delete Class"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      
+      {/* Edit Class Modal */}
+      {classToEdit && (
+        <EditClassModal 
+          isOpen={isEditModalOpen}
+          onClose={() => {
+            setIsEditModalOpen(false);
+            setClassToEdit(null);
+          }}
+          classData={classToEdit}
+        />
       )}
     </>
   );
