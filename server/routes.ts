@@ -135,6 +135,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Update a class
+  app.put('/api/classes/:id', async (req: Request, res: Response) => {
+    try {
+      const classId = parseInt(req.params.id);
+      
+      if (isNaN(classId)) {
+        return res.status(400).json({ message: 'Invalid class ID' });
+      }
+      
+      // Validate input
+      const { name, subject, description, gradeLevel } = req.body;
+      
+      // Create a clean update object with only provided fields
+      const updateData: Partial<InsertClass> = {};
+      if (name !== undefined) updateData.name = name;
+      if (subject !== undefined) updateData.subject = subject;
+      if (description !== undefined) updateData.description = description || null;
+      if (gradeLevel !== undefined) updateData.gradeLevel = gradeLevel;
+      
+      try {
+        const updatedClass = await storage.updateClass(classId, updateData);
+        return res.status(200).json(updatedClass);
+      } catch (error) {
+        if (error instanceof Error && error.message.includes('not found')) {
+          return res.status(404).json({ message: 'Class not found' });
+        }
+        throw error;
+      }
+    } catch (error) {
+      console.error('Error updating class:', error);
+      return res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+  
+  // Delete a class
+  app.delete('/api/classes/:id', async (req: Request, res: Response) => {
+    try {
+      const classId = parseInt(req.params.id);
+      
+      if (isNaN(classId)) {
+        return res.status(400).json({ message: 'Invalid class ID' });
+      }
+      
+      try {
+        await storage.deleteClass(classId);
+        return res.status(200).json({ message: 'Class deleted successfully' });
+      } catch (error) {
+        if (error instanceof Error && error.message.includes('not found')) {
+          return res.status(404).json({ message: 'Class not found' });
+        }
+        throw error;
+      }
+    } catch (error) {
+      console.error('Error deleting class:', error);
+      return res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+  
   // Enrollments routes
   app.get('/api/enrollments', async (req: Request, res: Response) => {
     try {

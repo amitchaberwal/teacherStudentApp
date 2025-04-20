@@ -18,6 +18,8 @@ export interface IStorage {
   getClassByCode(classCode: string): Promise<Class | undefined>;
   getClassesByTeacher(teacherId: number): Promise<Class[]>;
   createClass(classData: InsertClass): Promise<Class>;
+  updateClass(id: number, classData: Partial<InsertClass>): Promise<Class>;
+  deleteClass(id: number): Promise<void>;
   
   // Enrollment operations
   getEnrollmentsByStudent(studentId: number): Promise<Enrollment[]>;
@@ -116,6 +118,69 @@ export class MemStorage implements IStorage {
     const classRecord: Class = { ...classData, id, createdAt };
     this.classes.set(id, classRecord);
     return classRecord;
+  }
+  
+  async updateClass(id: number, classData: Partial<InsertClass>): Promise<Class> {
+    const existingClass = this.classes.get(id);
+    if (!existingClass) {
+      throw new Error(`Class with id ${id} not found`);
+    }
+    
+    const updatedClass: Class = { 
+      ...existingClass, 
+      ...classData,
+      // Keep the original id and createdAt values
+      id: existingClass.id,
+      createdAt: existingClass.createdAt
+    };
+    
+    this.classes.set(id, updatedClass);
+    return updatedClass;
+  }
+  
+  async deleteClass(id: number): Promise<void> {
+    const existingClass = this.classes.get(id);
+    if (!existingClass) {
+      throw new Error(`Class with id ${id} not found`);
+    }
+    
+    // Delete the class from the map
+    this.classes.delete(id);
+    
+    // Optional: Also delete related records (enrollments, attendance, etc.)
+    // This is a simplified implementation - in a real database, you'd use cascading deletes
+    
+    // Delete enrollments
+    const enrollmentsToDelete = Array.from(this.enrollments.values())
+      .filter(enrollment => enrollment.classId === id);
+      
+    enrollmentsToDelete.forEach(enrollment => {
+      this.enrollments.delete(enrollment.id);
+    });
+    
+    // Delete attendance records for this class
+    const attendanceToDelete = Array.from(this.attendanceRecords.values())
+      .filter(record => record.classId === id);
+      
+    attendanceToDelete.forEach(record => {
+      this.attendanceRecords.delete(record.id);
+    });
+    
+    // Delete assessments for this class
+    const assessmentsToDelete = Array.from(this.assessments.values())
+      .filter(assessment => assessment.classId === id);
+    
+    // Delete grades for the assessments in this class
+    assessmentsToDelete.forEach(assessment => {
+      const gradesToDelete = Array.from(this.grades.values())
+        .filter(grade => grade.assessmentId === assessment.id);
+        
+      gradesToDelete.forEach(grade => {
+        this.grades.delete(grade.id);
+      });
+      
+      this.assessments.delete(assessment.id);
+    });
   }
 
   // Enrollment operations
