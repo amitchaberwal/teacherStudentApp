@@ -1,12 +1,13 @@
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { classCodeSchema } from "@shared/schema";
-import { useAuth } from "../../hooks/use-auth";
 import { useMutation } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
-import { queryClient } from "@/lib/queryClient";
+import { useAuth } from "../../hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
-import { useLocation } from "wouter";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { classCodeSchema } from "@shared/schema";
+import { z } from "zod";
+
 import {
   Form,
   FormControl,
@@ -14,119 +15,120 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-  FormDescription,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { GraduationCap } from "lucide-react";
 
-type JoinClassFormValues = {
-  classCode: string;
-};
+const joinClassSchema = classCodeSchema;
+type JoinClassFormValues = z.infer<typeof joinClassSchema>;
 
 interface JoinClassProps {
-  onSuccess?: () => void;
+  onSuccess: () => void;
 }
 
 const JoinClass = ({ onSuccess }: JoinClassProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [, setLocation] = useLocation();
-
+  const [isLoading, setIsLoading] = useState(false);
+  
   const form = useForm<JoinClassFormValues>({
-    resolver: zodResolver(classCodeSchema),
+    resolver: zodResolver(joinClassSchema),
     defaultValues: {
       classCode: "",
     },
   });
 
-  const joinClassMutation = useMutation({
+  const enrollMutation = useMutation({
     mutationFn: (data: JoinClassFormValues) => {
       return apiRequest("POST", "/api/enrollments", {
         classCode: data.classCode,
         studentId: user?.id,
       });
     },
-    onSuccess: async () => {
+    onSuccess: () => {
       toast({
-        title: "Class joined",
+        title: "Success",
         description: "You have successfully joined the class",
       });
+      queryClient.invalidateQueries({ queryKey: ['/api/enrollments'] });
       form.reset();
-      queryClient.invalidateQueries({ queryKey: ['/api/enrollments', user?.id] });
-      
-      if (onSuccess) {
-        onSuccess();
-      } else {
-        setLocation("/student/dashboard");
-      }
+      onSuccess();
     },
     onError: (error) => {
       toast({
         title: "Error",
-        description: error.message || "Failed to join class",
+        description: error instanceof Error ? error.message : "Failed to join class",
         variant: "destructive",
       });
     },
   });
 
   const onSubmit = (data: JoinClassFormValues) => {
-    joinClassMutation.mutate(data);
-  };
-
-  const handleCancel = () => {
-    if (onSuccess) {
-      onSuccess();
-    } else {
-      setLocation("/student/dashboard");
-    }
+    enrollMutation.mutate(data);
   };
 
   return (
-    <div className="max-w-md mx-auto">
+    <div className="container max-w-xl mx-auto">
       <h3 className="text-xl font-medium mb-6">Join a Class</h3>
       
-      <Form {...form}>
-        <form 
-          onSubmit={form.handleSubmit(onSubmit)} 
-          className="bg-white rounded-lg shadow p-6"
-        >
-          <FormField
-            control={form.control}
-            name="classCode"
-            render={({ field }) => (
-              <FormItem className="mb-6">
-                <FormLabel className="text-gray-600">Class Code *</FormLabel>
-                <FormControl>
-                  <Input
-                    placeholder="Enter class code (e.g. MATH101-XYZ)"
-                    {...field}
-                  />
-                </FormControl>
-                <FormDescription>
-                  Enter the class code provided by your teacher
-                </FormDescription>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          
-          <div className="flex justify-between mt-8">
-            <Button 
-              type="button" 
-              variant="outline"
-              onClick={handleCancel}
-            >
-              Cancel
-            </Button>
-            <Button 
-              type="submit"
-              disabled={joinClassMutation.isPending}
-            >
-              {joinClassMutation.isPending ? "Joining..." : "Join Class"}
-            </Button>
+      <Card className="mb-6">
+        <CardContent className="p-6">
+          <div className="flex items-center mb-4">
+            <GraduationCap className="h-5 w-5 text-primary mr-2" />
+            <h4 className="text-lg font-medium">Enter Class Code</h4>
           </div>
-        </form>
-      </Form>
+          
+          <p className="text-gray-600 mb-6">
+            Enter the class code provided by your teacher to join a class. Class codes are typically
+            in the format SUBJ-XXXXXX (e.g., MATH-AB12CD).
+          </p>
+          
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)}>
+              <FormField
+                control={form.control}
+                name="classCode"
+                render={({ field }) => (
+                  <FormItem className="mb-4">
+                    <FormLabel>Class Code</FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="e.g., MATH-AB12CD" 
+                        autoCapitalize="characters"
+                        {...field} 
+                        value={field.value?.toUpperCase()}
+                        onChange={(e) => field.onChange(e.target.value?.toUpperCase())}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <div className="flex justify-end">
+                <Button 
+                  type="submit"
+                  disabled={enrollMutation.isPending || !form.formState.isValid}
+                >
+                  {enrollMutation.isPending ? "Joining..." : "Join Class"}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </CardContent>
+      </Card>
+      
+      <div className="bg-blue-50 p-6 rounded-lg">
+        <h4 className="text-blue-700 font-medium mb-2">Tips for Joining Classes</h4>
+        <ul className="list-disc list-inside text-blue-600 space-y-1">
+          <li>Make sure to enter the code exactly as provided by your teacher</li>
+          <li>Class codes are not case-sensitive</li>
+          <li>If you're having trouble, ask your teacher to verify the code</li>
+          <li>You cannot join a class twice</li>
+        </ul>
+      </div>
     </div>
   );
 };

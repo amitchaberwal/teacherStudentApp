@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "../../hooks/use-auth";
 import { useLocation } from "wouter";
-import { User, Bookmark, BookmarkPlus, Plus, Search, MoreVertical } from "lucide-react";
+import { User, Bookmark, BookmarkPlus, Plus, Search, MoreVertical, GraduationCap } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -169,7 +169,7 @@ const StudentDashboard = () => {
                 {/* Join Class Card */}
                 <Card className="border-dashed border-2 border-gray-300 hover:shadow-lg transition-shadow">
                   <CardContent className="flex flex-col items-center justify-center min-h-[16rem] p-6">
-                    <School className="h-12 w-12 text-gray-400 mb-4" />
+                    <GraduationCap className="h-12 w-12 text-gray-400 mb-4" />
                     <p className="text-center text-gray-600 mb-4">Join a new class</p>
                     <Button onClick={() => setActiveTab("join-class")}>
                       Join Class
