@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "../../hooks/use-auth";
 import { useLocation } from "wouter";
-import { Copy, MoreVertical, Plus, Search, Users } from "lucide-react";
+import { Copy, MoreVertical, Plus, Search, Users, Edit, Trash } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,6 +12,12 @@ import CreateClass from "./create-class";
 import AttendanceModal from "./attendance-modal";
 import GradesModal from "./grades-modal";
 import { Class } from "@shared/schema";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const TeacherDashboard = () => {
   const { user } = useAuth();
@@ -22,6 +28,7 @@ const TeacherDashboard = () => {
   const [selectedClass, setSelectedClass] = useState<Class | null>(null);
   const [isAttendanceModalOpen, setIsAttendanceModalOpen] = useState(false);
   const [isGradesModalOpen, setIsGradesModalOpen] = useState(false);
+  const [isManageModalOpen, setIsManageModalOpen] = useState(false);
 
   const { data: classes, isLoading, error } = useQuery({
     queryKey: ['/api/classes', user?.id],
@@ -49,6 +56,32 @@ const TeacherDashboard = () => {
   const handleGradesClick = (classItem: Class) => {
     setSelectedClass(classItem);
     setIsGradesModalOpen(true);
+  };
+
+  const handleManageClick = (classItem: Class) => {
+    setSelectedClass(classItem);
+    // For now just show a toast, but this could open a modal for managing the class
+    toast({
+      title: "Manage Class",
+      description: `You're now managing ${classItem.name}`,
+    });
+  };
+
+  const handleEditClass = (classItem: Class) => {
+    toast({
+      title: "Edit Class",
+      description: `Editing ${classItem.name}`,
+    });
+    // Future functionality: Open edit modal or navigate to edit page
+  };
+
+  const handleDeleteClass = (classItem: Class) => {
+    toast({
+      title: "Delete Class",
+      description: `This would delete ${classItem.name}`,
+      variant: "destructive",
+    });
+    // Future functionality: Show confirmation dialog and delete the class
   };
 
   const filteredClasses = classes?.filter((classItem: Class) => 
@@ -103,7 +136,21 @@ const TeacherDashboard = () => {
                     <CardContent className="p-6">
                       <div className="flex justify-between items-start mb-4">
                         <h4 className="text-lg font-medium">{classItem.name}</h4>
-                        <MoreVertical className="h-5 w-5 text-gray-400 cursor-pointer hover:text-primary" />
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <MoreVertical className="h-5 w-5 text-gray-400 cursor-pointer hover:text-primary" />
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleEditClass(classItem)}>
+                              <Edit className="h-4 w-4 mr-2" />
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleDeleteClass(classItem)}>
+                              <Trash className="h-4 w-4 mr-2" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                       <p className="text-gray-600 mb-4">{classItem.description}</p>
                       <div className="flex items-center mb-4">
@@ -126,7 +173,11 @@ const TeacherDashboard = () => {
                         </div>
                       </div>
                       <div className="flex justify-between">
-                        <Button variant="ghost" className="text-primary">
+                        <Button 
+                          variant="ghost" 
+                          className="text-primary"
+                          onClick={() => handleManageClick(classItem)}
+                        >
                           Manage
                         </Button>
                         <div>
