@@ -59,9 +59,11 @@ const CreateClass = ({ onSuccess }: CreateClassProps) => {
 
   const createClassMutation = useMutation({
     mutationFn: (data: CreateClassFormValues) => {
+      // Make sure we include teacherId as a number (not undefined) and don't need to supply classCode
+      // as the server will generate one for us
       const formDataWithTeacher = {
         ...data,
-        teacherId: user?.id,
+        teacherId: user?.id as number,
       };
       return apiRequest("POST", "/api/classes", formDataWithTeacher);
     },
@@ -168,7 +170,11 @@ const CreateClass = ({ onSuccess }: CreateClassProps) => {
                   <Textarea
                     placeholder="Brief description of the class"
                     rows={3}
-                    {...field}
+                    value={field.value || ''}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                    name={field.name}
+                    ref={field.ref}
                   />
                 </FormControl>
                 <FormMessage />

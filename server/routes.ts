@@ -79,18 +79,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   app.post('/api/classes', async (req: Request, res: Response) => {
     try {
-      const data = insertClassSchema.parse(req.body);
+      // Debugging
+      console.log('Class creation request body:', req.body);
       
-      // Generate a unique class code if not provided
-      if (!data.classCode) {
-        const prefix = data.subject.substring(0, 4).toUpperCase();
-        const randomStr = Math.random().toString(36).substring(2, 8).toUpperCase();
-        data.classCode = `${prefix}-${randomStr}`;
+      // Validate data
+      const { teacherId, name, subject, description, gradeLevel } = req.body;
+      
+      if (!teacherId || typeof teacherId !== 'number') {
+        return res.status(400).json({ message: 'Teacher ID is required and must be a number' });
       }
       
-      const classRecord = await storage.createClass(data);
+      // Create a validated object with only the required fields
+      const classData = {
+        teacherId,
+        name,
+        subject,
+        description: description || '',
+        gradeLevel,
+        classCode: '' // Will be generated below
+      };
+      
+      // Generate a unique class code
+      const prefix = classData.subject.substring(0, 4).toUpperCase();
+      const randomStr = Math.random().toString(36).substring(2, 8).toUpperCase();
+      classData.classCode = `${prefix}-${randomStr}`;
+      
+      const classRecord = await storage.createClass(classData);
       return res.status(201).json(classRecord);
     } catch (error) {
+      console.error('Error creating class:', error);
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: error.errors });
       }
