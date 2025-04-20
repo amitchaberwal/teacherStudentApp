@@ -37,7 +37,7 @@ function Router() {
         {isAuthenticated && user?.role === "student" ? <StudentDashboard /> : <RoleSelection />}
       </Route>
       <Route path="/student/join-class">
-        {isAuthenticated && user?.role === "student" ? <JoinClass /> : <RoleSelection />}
+        {isAuthenticated && user?.role === "student" ? <JoinClass onSuccess={() => {}} /> : <RoleSelection />}
       </Route>
       
       {/* Fallback to 404 */}
