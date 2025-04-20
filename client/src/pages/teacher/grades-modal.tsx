@@ -1,19 +1,17 @@
 import { useState, useEffect } from "react";
-import { X, Plus } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient } from "@/lib/queryClient";
-import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Class, InsertAssessment, InsertGrade } from "@shared/schema";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { Class } from "@shared/schema";
+
 import {
   Dialog,
   DialogContent,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -21,14 +19,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { PlusCircle } from "lucide-react";
 
 interface GradesModalProps {
   isOpen: boolean;
@@ -36,107 +31,193 @@ interface GradesModalProps {
   classData: Class;
 }
 
+interface Student {
+  id: number;
+  name: string;
+  username: string;
+}
+
+interface Assessment {
+  id: number;
+  name: string;
+  description: string | null;
+  type: "quiz" | "test" | "assignment" | "project" | "exam" | "other";
+  maxScore: number;
+  classId: number;
+  createdAt: Date;
+}
+
+interface Grade {
+  id?: number;
+  studentId: number;
+  assessmentId: number;
+  score: number;
+  comment: string | null;
+}
+
 const GradesModal = ({ isOpen, onClose, classData }: GradesModalProps) => {
   const { toast } = useToast();
-  const [selectedAssessmentId, setSelectedAssessmentId] = useState<number | "">("");
-  const [newAssessmentName, setNewAssessmentName] = useState("");
-  const [gradeRecords, setGradeRecords] = useState<Record<number, {
-    score: number;
-    comment: string;
-  }>>({});
+  const [activeTab, setActiveTab] = useState("enter-grades");
+  const [selectedAssessment, setSelectedAssessment] = useState<number | null>(null);
+  const [isNewAssessmentMode, setIsNewAssessmentMode] = useState(false);
+  const [newAssessment, setNewAssessment] = useState({
+    name: "",
+    description: "",
+    type: "quiz",
+    maxScore: 100,
+    classId: classData?.id
+  });
+  const [grades, setGrades] = useState<Map<number, Grade>>(new Map());
 
+  // Fetch students in this class
   const { data: students, isLoading: isLoadingStudents } = useQuery({
-    queryKey: [`/api/classes/${classData.id}/students`],
-    queryFn: () => fetch(`/api/classes/${classData.id}/students`).then((res) => res.json()),
-    enabled: isOpen && !!classData.id,
+    queryKey: ['/api/classes', classData?.id, 'students'],
+    queryFn: () => 
+      fetch(`/api/classes/${classData?.id}/students`)
+      .then(res => {
+        if (!res.ok) throw new Error("Failed to load students");
+        return res.json();
+      }),
+    enabled: isOpen && !!classData,
   });
 
-  const { data: assessments, isLoading: isLoadingAssessments } = useQuery({
-    queryKey: [`/api/classes/${classData.id}/assessments`],
-    queryFn: () => fetch(`/api/classes/${classData.id}/assessments`).then((res) => res.json()),
-    enabled: isOpen && !!classData.id,
+  // Fetch assessments for this class
+  const { data: assessments, isLoading: isLoadingAssessments, refetch: refetchAssessments } = useQuery({
+    queryKey: ['/api/classes', classData?.id, 'assessments'],
+    queryFn: () => 
+      fetch(`/api/classes/${classData?.id}/assessments`)
+      .then(res => {
+        if (!res.ok) throw new Error("Failed to load assessments");
+        return res.json();
+      }),
+    enabled: isOpen && !!classData,
   });
 
-  const { data: grades, isLoading: isLoadingGrades } = useQuery({
-    queryKey: [`/api/assessments/${selectedAssessmentId}/grades`],
-    queryFn: () => fetch(`/api/assessments/${selectedAssessmentId}/grades`).then((res) => res.json()),
-    enabled: isOpen && !!selectedAssessmentId && selectedAssessmentId !== "",
+  // Fetch grades for selected assessment
+  const { data: existingGrades, isLoading: isLoadingGrades, refetch: refetchGrades } = useQuery({
+    queryKey: ['/api/assessments', selectedAssessment, 'grades'],
+    queryFn: () => 
+      fetch(`/api/assessments/${selectedAssessment}/grades`)
+      .then(res => {
+        if (!res.ok) throw new Error("Failed to load grades");
+        return res.json();
+      }),
+    enabled: isOpen && !!selectedAssessment,
   });
 
+  // Set default selected assessment when assessments load
   useEffect(() => {
-    // Initialize or update grade records when grades data is loaded
-    if (students && grades && !isLoadingGrades) {
-      const newRecords: Record<number, { score: number; comment: string }> = {};
-      
-      students.forEach((student: any) => {
-        // Find existing grade for this student
-        const existing = grades.find(
-          (g: any) => g.studentId === student.id
-        );
-        
-        newRecords[student.id] = {
-          score: existing?.score || 0,
-          comment: existing?.comment || "",
-        };
-      });
-      
-      setGradeRecords(newRecords);
+    if (assessments && assessments.length > 0 && !selectedAssessment) {
+      setSelectedAssessment(assessments[0].id);
     }
-  }, [students, grades, isLoadingGrades]);
+  }, [assessments, selectedAssessment]);
 
+  // Initialize grades map when students or existing grades change
+  useEffect(() => {
+    if (!students || !selectedAssessment) return;
+
+    const newGrades = new Map<number, Grade>();
+    
+    // Set default empty grades for all students
+    students.forEach((student: Student) => {
+      newGrades.set(student.id, {
+        studentId: student.id,
+        assessmentId: selectedAssessment,
+        score: 0,
+        comment: null
+      });
+    });
+    
+    // Override with existing grades if available
+    if (existingGrades && existingGrades.length > 0) {
+      existingGrades.forEach((grade: Grade) => {
+        if (newGrades.has(grade.studentId)) {
+          newGrades.set(grade.studentId, grade);
+        }
+      });
+    }
+    
+    setGrades(newGrades);
+  }, [students, existingGrades, selectedAssessment]);
+
+  // Update grade score for a student
+  const handleScoreChange = (studentId: number, score: string) => {
+    const parsedScore = parseFloat(score);
+    if (isNaN(parsedScore)) return;
+    
+    const updatedGrades = new Map(grades);
+    const existingGrade = updatedGrades.get(studentId);
+    
+    if (existingGrade) {
+      updatedGrades.set(studentId, { ...existingGrade, score: parsedScore });
+      setGrades(updatedGrades);
+    }
+  };
+
+  // Update comment for a student's grade
+  const handleCommentChange = (studentId: number, comment: string) => {
+    const updatedGrades = new Map(grades);
+    const existingGrade = updatedGrades.get(studentId);
+    
+    if (existingGrade) {
+      updatedGrades.set(studentId, { ...existingGrade, comment });
+      setGrades(updatedGrades);
+    }
+  };
+
+  // Create new assessment
   const createAssessmentMutation = useMutation({
-    mutationFn: (data: InsertAssessment) => {
-      return apiRequest("POST", "/api/assessments", data);
+    mutationFn: (assessment: any) => {
+      return apiRequest("POST", "/api/assessments", assessment);
     },
-    onSuccess: (response) => {
+    onSuccess: (data) => {
       toast({
-        title: "Assessment added",
-        description: "New assessment has been created",
+        title: "Assessment created",
+        description: `${newAssessment.name} has been created successfully.`,
       });
-      queryClient.invalidateQueries({ 
-        queryKey: [`/api/classes/${classData.id}/assessments`]
-      });
-      setNewAssessmentName("");
-      
-      // Get the ID from the response and select the new assessment
-      response.json().then((data) => {
-        setSelectedAssessmentId(data.id);
+      refetchAssessments();
+      setIsNewAssessmentMode(false);
+      setSelectedAssessment(data.id);
+      setNewAssessment({
+        name: "",
+        description: "",
+        type: "quiz",
+        maxScore: 100,
+        classId: classData?.id
       });
     },
     onError: (error) => {
       toast({
         title: "Error",
-        description: error.message || "Failed to create assessment",
+        description: error instanceof Error ? error.message : "Failed to create assessment",
         variant: "destructive",
       });
     },
   });
 
+  // Save grades for selected assessment
   const saveGradesMutation = useMutation({
-    mutationFn: (records: InsertGrade[]) => {
-      return apiRequest("POST", "/api/grades/bulk", { records });
+    mutationFn: (grades: any[]) => {
+      return apiRequest("POST", "/api/grades/bulk", { records: grades });
     },
     onSuccess: () => {
       toast({
         title: "Grades saved",
-        description: "Grade records have been updated",
+        description: "Grades have been saved successfully.",
       });
-      queryClient.invalidateQueries({ 
-        queryKey: [`/api/assessments/${selectedAssessmentId}/grades`]
-      });
-      onClose();
+      refetchGrades();
     },
     onError: (error) => {
       toast({
         title: "Error",
-        description: error.message || "Failed to save grades",
+        description: error instanceof Error ? error.message : "Failed to save grades",
         variant: "destructive",
       });
     },
   });
 
-  const handleAddAssessment = () => {
-    if (!newAssessmentName.trim()) {
+  const handleCreateAssessment = () => {
+    if (!newAssessment.name) {
       toast({
         title: "Error",
         description: "Assessment name is required",
@@ -145,149 +226,278 @@ const GradesModal = ({ isOpen, onClose, classData }: GradesModalProps) => {
       return;
     }
     
-    createAssessmentMutation.mutate({
-      classId: classData.id,
-      name: newAssessmentName.trim()
-    });
+    createAssessmentMutation.mutate(newAssessment);
   };
 
   const handleSaveGrades = () => {
-    if (!students || !selectedAssessmentId) return;
+    if (!selectedAssessment) return;
     
-    const records = students.map((student: any) => ({
-      assessmentId: selectedAssessmentId as number,
-      studentId: student.id,
-      score: gradeRecords[student.id]?.score || 0,
-      comment: gradeRecords[student.id]?.comment || "",
-    }));
-    
-    saveGradesMutation.mutate(records);
+    const gradesArray = Array.from(grades.values());
+    saveGradesMutation.mutate(gradesArray);
+  };
+
+  const getCurrentAssessment = () => {
+    if (!assessments || !selectedAssessment) return null;
+    return assessments.find((a: Assessment) => a.id === selectedAssessment);
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto">
+      <DialogContent className="sm:max-w-[700px] max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex justify-between items-center">
-            <span>Grades: {classData.name}</span>
-          </DialogTitle>
+          <DialogTitle>Grades for {classData?.name}</DialogTitle>
         </DialogHeader>
-
-        <div className="p-1">
-          <div className="mb-6 flex flex-wrap items-center gap-4">
-            <div>
-              <label htmlFor="assessmentSelect" className="block text-gray-600 mb-2">Assessment</label>
-              <Select 
-                value={selectedAssessmentId ? String(selectedAssessmentId) : ""}
-                onValueChange={(value) => setSelectedAssessmentId(Number(value))}
-              >
-                <SelectTrigger id="assessmentSelect" className="w-[180px]">
-                  <SelectValue placeholder="Select Assessment" />
-                </SelectTrigger>
-                <SelectContent>
-                  {assessments?.map((assessment: any) => (
-                    <SelectItem key={assessment.id} value={String(assessment.id)}>
-                      {assessment.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div>
-              <label htmlFor="newAssessment" className="block text-gray-600 mb-2">New Assessment</label>
-              <div className="flex">
-                <Input
-                  id="newAssessment"
-                  placeholder="e.g. Quiz 2"
-                  value={newAssessmentName}
-                  onChange={(e) => setNewAssessmentName(e.target.value)}
-                  className="rounded-r-none"
-                />
-                <Button 
-                  onClick={handleAddAssessment}
-                  disabled={createAssessmentMutation.isPending}
-                  className="rounded-l-none"
-                >
-                  <Plus className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          </div>
+        
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="mb-4">
+            <TabsTrigger value="enter-grades">Enter Grades</TabsTrigger>
+            <TabsTrigger value="view-summary">Grade Summary</TabsTrigger>
+          </TabsList>
           
-          {!selectedAssessmentId ? (
-            <div className="text-center py-10">Select or create an assessment to enter grades</div>
-          ) : isLoadingStudents ? (
-            <div className="text-center py-4">Loading students...</div>
-          ) : students?.length > 0 ? (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-gray-100">
-                    <TableHead>Student Name</TableHead>
-                    <TableHead>Student ID</TableHead>
-                    <TableHead>Grade</TableHead>
-                    <TableHead>Comments</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {students.map((student: any) => (
-                    <TableRow key={student.id} className="border-b border-gray-200">
-                      <TableCell>{student.name}</TableCell>
-                      <TableCell>ST-{student.id}</TableCell>
-                      <TableCell className="w-32">
-                        <Input
-                          type="number"
-                          min="0"
-                          max="100"
-                          step="0.1"
-                          placeholder="0-100"
-                          value={gradeRecords[student.id]?.score || ""}
-                          onChange={(e) => {
-                            setGradeRecords({
-                              ...gradeRecords,
-                              [student.id]: {
-                                ...gradeRecords[student.id],
-                                score: Number(e.target.value),
-                              },
-                            });
-                          }}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          placeholder="Optional comment"
-                          value={gradeRecords[student.id]?.comment || ""}
-                          onChange={(e) => {
-                            setGradeRecords({
-                              ...gradeRecords,
-                              [student.id]: {
-                                ...gradeRecords[student.id],
-                                comment: e.target.value,
-                              },
-                            });
-                          }}
-                        />
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          ) : (
-            <div className="text-center py-4">No students enrolled in this class.</div>
-          )}
-        </div>
-
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
+          <TabsContent value="enter-grades">
+            {isNewAssessmentMode ? (
+              <div className="space-y-4 mb-6 p-4 border rounded-lg">
+                <h3 className="text-lg font-medium mb-4">Create New Assessment</h3>
+                
+                <div className="grid gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="assessment-name">Assessment Name *</Label>
+                    <Input
+                      id="assessment-name"
+                      value={newAssessment.name}
+                      onChange={(e) => setNewAssessment({...newAssessment, name: e.target.value})}
+                      placeholder="e.g. Midterm Exam"
+                    />
+                  </div>
+                  
+                  <div className="grid gap-2">
+                    <Label htmlFor="assessment-type">Type</Label>
+                    <Select
+                      value={newAssessment.type}
+                      onValueChange={(value) => setNewAssessment({...newAssessment, type: value})}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="quiz">Quiz</SelectItem>
+                        <SelectItem value="test">Test</SelectItem>
+                        <SelectItem value="assignment">Assignment</SelectItem>
+                        <SelectItem value="project">Project</SelectItem>
+                        <SelectItem value="exam">Exam</SelectItem>
+                        <SelectItem value="other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="grid gap-2">
+                    <Label htmlFor="assessment-max-score">Maximum Score</Label>
+                    <Input
+                      id="assessment-max-score"
+                      type="number"
+                      value={newAssessment.maxScore}
+                      onChange={(e) => setNewAssessment({...newAssessment, maxScore: parseInt(e.target.value) || 0})}
+                    />
+                  </div>
+                  
+                  <div className="grid gap-2">
+                    <Label htmlFor="assessment-description">Description (Optional)</Label>
+                    <Textarea
+                      id="assessment-description"
+                      value={newAssessment.description}
+                      onChange={(e) => setNewAssessment({...newAssessment, description: e.target.value})}
+                      placeholder="Brief description of this assessment"
+                    />
+                  </div>
+                </div>
+                
+                <div className="flex justify-end space-x-2 mt-4">
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setIsNewAssessmentMode(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleCreateAssessment}
+                    disabled={createAssessmentMutation.isPending || !newAssessment.name}
+                  >
+                    {createAssessmentMutation.isPending ? "Creating..." : "Create Assessment"}
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="mb-6">
+                <div className="flex justify-between items-center">
+                  <div className="flex-1 mr-4">
+                    <Label htmlFor="select-assessment" className="mb-2 block">Select Assessment</Label>
+                    <Select
+                      value={selectedAssessment?.toString() || ""}
+                      onValueChange={(value) => setSelectedAssessment(parseInt(value))}
+                      disabled={isLoadingAssessments || (assessments && assessments.length === 0)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder={isLoadingAssessments ? "Loading..." : "Select assessment"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {assessments && assessments.map((assessment: Assessment) => (
+                          <SelectItem key={assessment.id} value={assessment.id.toString()}>
+                            {assessment.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <Button 
+                    variant="outline"
+                    className="flex items-center mt-7"
+                    onClick={() => setIsNewAssessmentMode(true)}
+                  >
+                    <PlusCircle className="h-4 w-4 mr-1" />
+                    New
+                  </Button>
+                </div>
+                
+                {/* Current assessment details */}
+                {getCurrentAssessment() && (
+                  <div className="mt-4 p-3 bg-gray-50 rounded-md text-sm">
+                    <p><strong>Type:</strong> {getCurrentAssessment()?.type.charAt(0).toUpperCase() + getCurrentAssessment()?.type.slice(1)}</p>
+                    <p><strong>Max Score:</strong> {getCurrentAssessment()?.maxScore}</p>
+                    {getCurrentAssessment()?.description && (
+                      <p><strong>Description:</strong> {getCurrentAssessment()?.description}</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+            
+            {!isNewAssessmentMode && (
+              <div>
+                {isLoadingStudents || isLoadingGrades ? (
+                  <div className="text-center py-8">Loading...</div>
+                ) : !assessments || assessments.length === 0 ? (
+                  <div className="text-center py-8">
+                    No assessments created yet. Create a new assessment to start entering grades.
+                  </div>
+                ) : !students || students.length === 0 ? (
+                  <div className="text-center py-8">
+                    No students enrolled in this class yet.
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {students.map((student: Student) => {
+                      const grade = grades.get(student.id);
+                      
+                      return (
+                        <div key={student.id} className="p-4 border rounded-lg">
+                          <div className="flex justify-between mb-3">
+                            <div>
+                              <h4 className="font-medium">{student.name}</h4>
+                              <p className="text-sm text-gray-500">{student.username}</p>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <Label htmlFor={`score-${student.id}`} className="mr-2">Score:</Label>
+                              <Input
+                                id={`score-${student.id}`}
+                                type="number"
+                                className="w-[100px]"
+                                value={grade?.score || 0}
+                                onChange={(e) => handleScoreChange(student.id, e.target.value)}
+                                min={0}
+                                max={getCurrentAssessment()?.maxScore || 100}
+                              />
+                              <span className="text-sm text-gray-500">/ {getCurrentAssessment()?.maxScore || 100}</span>
+                            </div>
+                          </div>
+                          
+                          <Textarea
+                            placeholder="Add feedback (optional)"
+                            value={grade?.comment || ""}
+                            onChange={(e) => handleCommentChange(student.id, e.target.value)}
+                            className="h-20"
+                          />
+                        </div>
+                      );
+                    })}
+                    
+                    <div className="flex justify-end mt-4">
+                      <Button
+                        onClick={handleSaveGrades}
+                        disabled={saveGradesMutation.isPending || !selectedAssessment}
+                      >
+                        {saveGradesMutation.isPending ? "Saving..." : "Save Grades"}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </TabsContent>
+          
+          <TabsContent value="view-summary">
+            {isLoadingStudents || isLoadingAssessments ? (
+              <div className="text-center py-8">Loading grade data...</div>
+            ) : !assessments || assessments.length === 0 ? (
+              <div className="text-center py-8">
+                No assessments created yet. Create assessments to view grade summaries.
+              </div>
+            ) : !students || students.length === 0 ? (
+              <div className="text-center py-8">
+                No students enrolled in this class yet.
+              </div>
+            ) : (
+              <div className="space-y-6">
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Student
+                        </th>
+                        {assessments.map((assessment: Assessment) => (
+                          <th key={assessment.id} scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            {assessment.name}
+                          </th>
+                        ))}
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Average
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {students.map((student: Student) => (
+                        <tr key={student.id}>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="font-medium">{student.name}</div>
+                            <div className="text-sm text-gray-500">{student.username}</div>
+                          </td>
+                          {/* This would be populated with actual grade data from the API */}
+                          {assessments.map((assessment: Assessment) => (
+                            <td key={assessment.id} className="px-6 py-4 whitespace-nowrap">
+                              {/* Placeholder for grade display */}
+                              <div className="text-sm">-</div>
+                            </td>
+                          ))}
+                          <td className="px-6 py-4 whitespace-nowrap font-medium">
+                            -
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
+        
+        <DialogFooter className="mt-6">
           <Button 
-            onClick={handleSaveGrades}
-            disabled={!selectedAssessmentId || saveGradesMutation.isPending}
+            variant="outline" 
+            onClick={onClose}
           >
-            {saveGradesMutation.isPending ? "Saving..." : "Save Grades"}
+            Close
           </Button>
         </DialogFooter>
       </DialogContent>
