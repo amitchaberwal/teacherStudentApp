@@ -3,7 +3,6 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Card, CardContent } from "@/components/ui/card";
 import { useAuth } from "../hooks/use-auth";
-import { useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { GraduationCap, User, KeyRound, ChevronLeft, UserPlus } from "lucide-react";
 import { z } from "zod";
@@ -25,9 +24,8 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
-} from "@/components/ui/dialog";
+} from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { apiRequest } from "@/lib/queryClient";
 
 type UserRole = "teacher" | "student";
 

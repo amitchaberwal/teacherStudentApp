@@ -115,7 +115,12 @@ export class MemStorage implements IStorage {
   async createClass(classData: InsertClass): Promise<Class> {
     const id = this.classId++;
     const createdAt = new Date();
-    const classRecord: Class = { ...classData, id, createdAt };
+    const classRecord: Class = { 
+      ...classData, 
+      id, 
+      createdAt,
+      description: classData.description ?? null 
+    };
     this.classes.set(id, classRecord);
     return classRecord;
   }
