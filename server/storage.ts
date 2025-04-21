@@ -15,7 +15,7 @@ sqlite.exec(`
     role TEXT NOT NULL,
     name TEXT NOT NULL
   );
-  
+
   CREATE TABLE IF NOT EXISTS classes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
@@ -27,7 +27,7 @@ sqlite.exec(`
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (teacher_id) REFERENCES users(id)
   );
-  
+
   CREATE TABLE IF NOT EXISTS enrollments (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     student_id INTEGER NOT NULL,
@@ -36,7 +36,7 @@ sqlite.exec(`
     FOREIGN KEY (student_id) REFERENCES users(id),
     FOREIGN KEY (class_id) REFERENCES classes(id)
   );
-  
+
   CREATE TABLE IF NOT EXISTS attendance (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     student_id INTEGER NOT NULL,
@@ -46,7 +46,7 @@ sqlite.exec(`
     FOREIGN KEY (student_id) REFERENCES users(id),
     FOREIGN KEY (class_id) REFERENCES classes(id)
   );
-  
+
   CREATE TABLE IF NOT EXISTS assessments (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     class_id INTEGER NOT NULL,
@@ -54,7 +54,7 @@ sqlite.exec(`
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (class_id) REFERENCES classes(id)
   );
-  
+
   CREATE TABLE IF NOT EXISTS grades (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     student_id INTEGER NOT NULL,
@@ -94,8 +94,7 @@ export class Storage {
   }
 
   async createClass(classData: schema.InsertClass) {
-    const [newClass] = await db.insert(schema.classes).values(classData).returning();
-    return newClass;
+    return await db.insert(schema.classes).values(classData).returning().get();
   }
 
   async getClasses() {
@@ -103,8 +102,7 @@ export class Storage {
   }
 
   async getClassById(id: number) {
-    const [class_] = await db.select().from(schema.classes).where(eq(schema.classes.id, id));
-    return class_;
+    return await db.select().from(schema.classes).where(eq(schema.classes.id, id)).get();
   }
 
   async getClassesByTeacher(teacherId: number) {
@@ -112,11 +110,11 @@ export class Storage {
   }
 
   async updateClass(id: number, classData: Partial<schema.InsertClass>) {
-    const [updatedClass] = await db.update(schema.classes)
+    return await db.update(schema.classes)
       .set(classData)
       .where(eq(schema.classes.id, id))
-      .returning();
-    return updatedClass;
+      .returning()
+      .get();
   }
 
   async deleteClass(id: number) {
@@ -124,8 +122,7 @@ export class Storage {
   }
 
   async createEnrollment(enrollmentData: schema.InsertEnrollment) {
-    const [enrollment] = await db.insert(schema.enrollments).values(enrollmentData).returning();
-    return enrollment;
+    return await db.insert(schema.enrollments).values(enrollmentData).returning().get();
   }
 
   async getEnrollments(studentId: number) {
@@ -139,8 +136,7 @@ export class Storage {
   }
 
   async createAssessment(assessmentData: schema.InsertAssessment) {
-    const [assessment] = await db.insert(schema.assessments).values(assessmentData).returning();
-    return assessment;
+    return await db.insert(schema.assessments).values(assessmentData).returning().get();
   }
 
   async getAssessmentsByClass(classId: number) {
@@ -148,8 +144,7 @@ export class Storage {
   }
 
   async createGrade(gradeData: schema.InsertGrade) {
-    const [grade] = await db.insert(schema.grades).values(gradeData).returning();
-    return grade;
+    return await db.insert(schema.grades).values(gradeData).returning().get();
   }
 
   async getGradesByAssessment(assessmentId: number) {
@@ -163,16 +158,15 @@ export class Storage {
   }
 
   async updateGrade(id: number, gradeData: Partial<schema.InsertGrade>) {
-    const [updatedGrade] = await db.update(schema.grades)
+    return await db.update(schema.grades)
       .set(gradeData)
       .where(eq(schema.grades.id, id))
-      .returning();
-    return updatedGrade;
+      .returning()
+      .get();
   }
 
   async createAttendance(attendanceData: schema.InsertAttendance) {
-    const [attendance] = await db.insert(schema.attendance).values(attendanceData).returning();
-    return attendance;
+    return await db.insert(schema.attendance).values(attendanceData).returning().get();
   }
 
   async getAttendanceByClass(classId: number) {
@@ -189,11 +183,11 @@ export class Storage {
   }
 
   async updateAttendance(id: number, attendanceData: Partial<schema.InsertAttendance>) {
-    const [updatedAttendance] = await db.update(schema.attendance)
+    return await db.update(schema.attendance)
       .set(attendanceData)
       .where(eq(schema.attendance.id, id))
-      .returning();
-    return updatedAttendance;
+      .returning()
+      .get();
   }
 }
 
