@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "../../hooks/use-auth";
 import { useLocation } from "wouter";
-import { User, Bookmark, BookmarkPlus, Plus, Search, MoreVertical, GraduationCap } from "lucide-react";
+import { User, Bookmark, BookmarkPlus, Plus, Search, MoreVertical, GraduationCap, Calendar } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -151,7 +151,7 @@ const StudentDashboard = () => {
                             className="bg-blue-50 hover:bg-blue-100 text-blue-600 mr-2"
                             onClick={() => handleAttendanceClick(classItem)}
                           >
-                            <CalendarIcon className="h-4 w-4 mr-1" />
+                            <Calendar className="h-4 w-4 mr-1" />
                             Attendance
                           </Button>
                           <Button 
