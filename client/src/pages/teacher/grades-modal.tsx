@@ -117,7 +117,7 @@ const GradesModal = ({ isOpen, onClose, classData }: GradesModalProps) => {
     if (!students || !selectedAssessment) return;
 
     const newGrades = new Map<number, Grade>();
-    
+
     // Set default empty grades for all students
     students.forEach((student: Student) => {
       newGrades.set(student.id, {
@@ -127,7 +127,7 @@ const GradesModal = ({ isOpen, onClose, classData }: GradesModalProps) => {
         comment: null
       });
     });
-    
+
     // Override with existing grades if available
     if (existingGrades && existingGrades.length > 0) {
       existingGrades.forEach((grade: Grade) => {
@@ -136,7 +136,7 @@ const GradesModal = ({ isOpen, onClose, classData }: GradesModalProps) => {
         }
       });
     }
-    
+
     setGrades(newGrades);
   }, [students, existingGrades, selectedAssessment]);
 
@@ -144,10 +144,10 @@ const GradesModal = ({ isOpen, onClose, classData }: GradesModalProps) => {
   const handleScoreChange = (studentId: number, score: string) => {
     const parsedScore = parseFloat(score);
     if (isNaN(parsedScore)) return;
-    
+
     const updatedGrades = new Map(grades);
     const existingGrade = updatedGrades.get(studentId);
-    
+
     if (existingGrade) {
       updatedGrades.set(studentId, { ...existingGrade, score: parsedScore });
       setGrades(updatedGrades);
@@ -158,7 +158,7 @@ const GradesModal = ({ isOpen, onClose, classData }: GradesModalProps) => {
   const handleCommentChange = (studentId: number, comment: string) => {
     const updatedGrades = new Map(grades);
     const existingGrade = updatedGrades.get(studentId);
-    
+
     if (existingGrade) {
       updatedGrades.set(studentId, { ...existingGrade, comment });
       setGrades(updatedGrades);
@@ -225,13 +225,13 @@ const GradesModal = ({ isOpen, onClose, classData }: GradesModalProps) => {
       });
       return;
     }
-    
+
     createAssessmentMutation.mutate(newAssessment);
   };
 
   const handleSaveGrades = () => {
     if (!selectedAssessment) return;
-    
+
     const gradesArray = Array.from(grades.values());
     saveGradesMutation.mutate(gradesArray);
   };
@@ -245,20 +245,20 @@ const GradesModal = ({ isOpen, onClose, classData }: GradesModalProps) => {
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-[700px] max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Grades for {classData?.name}</DialogTitle>
+          <DialogTitle>Grades for {(classData?.name || '').charAt(0).toUpperCase() + (classData?.name || '').slice(1)}</DialogTitle>
         </DialogHeader>
-        
+
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="mb-4">
             <TabsTrigger value="enter-grades">Enter Grades</TabsTrigger>
             <TabsTrigger value="view-summary">Grade Summary</TabsTrigger>
           </TabsList>
-          
+
           <TabsContent value="enter-grades">
             {isNewAssessmentMode ? (
               <div className="space-y-4 mb-6 p-4 border rounded-lg">
                 <h3 className="text-lg font-medium mb-4">Create New Assessment</h3>
-                
+
                 <div className="grid gap-4">
                   <div className="grid gap-2">
                     <Label htmlFor="assessment-name">Assessment Name *</Label>
@@ -269,7 +269,7 @@ const GradesModal = ({ isOpen, onClose, classData }: GradesModalProps) => {
                       placeholder="e.g. Midterm Exam"
                     />
                   </div>
-                  
+
                   <div className="grid gap-2">
                     <Label htmlFor="assessment-type">Type</Label>
                     <Select
@@ -289,7 +289,7 @@ const GradesModal = ({ isOpen, onClose, classData }: GradesModalProps) => {
                       </SelectContent>
                     </Select>
                   </div>
-                  
+
                   <div className="grid gap-2">
                     <Label htmlFor="assessment-max-score">Maximum Score</Label>
                     <Input
@@ -299,7 +299,7 @@ const GradesModal = ({ isOpen, onClose, classData }: GradesModalProps) => {
                       onChange={(e) => setNewAssessment({...newAssessment, maxScore: parseInt(e.target.value) || 0})}
                     />
                   </div>
-                  
+
                   <div className="grid gap-2">
                     <Label htmlFor="assessment-description">Description (Optional)</Label>
                     <Textarea
@@ -310,7 +310,7 @@ const GradesModal = ({ isOpen, onClose, classData }: GradesModalProps) => {
                     />
                   </div>
                 </div>
-                
+
                 <div className="flex justify-end space-x-2 mt-4">
                   <Button 
                     variant="outline" 
@@ -348,7 +348,7 @@ const GradesModal = ({ isOpen, onClose, classData }: GradesModalProps) => {
                       </SelectContent>
                     </Select>
                   </div>
-                  
+
                   <Button 
                     variant="outline"
                     className="flex items-center mt-7"
@@ -358,11 +358,11 @@ const GradesModal = ({ isOpen, onClose, classData }: GradesModalProps) => {
                     New
                   </Button>
                 </div>
-                
+
                 {/* Current assessment details */}
                 {getCurrentAssessment() && (
                   <div className="mt-4 p-3 bg-gray-50 rounded-md text-sm">
-                    <p><strong>Type:</strong> {getCurrentAssessment()?.type.charAt(0).toUpperCase() + getCurrentAssessment()?.type.slice(1)}</p>
+                    <p><strong>Type:</strong> {(getCurrentAssessment()?.type || '').charAt(0).toUpperCase() + (getCurrentAssessment()?.type || '').slice(1)}</p>
                     <p><strong>Max Score:</strong> {getCurrentAssessment()?.maxScore}</p>
                     {getCurrentAssessment()?.description && (
                       <p><strong>Description:</strong> {getCurrentAssessment()?.description}</p>
@@ -371,7 +371,7 @@ const GradesModal = ({ isOpen, onClose, classData }: GradesModalProps) => {
                 )}
               </div>
             )}
-            
+
             {!isNewAssessmentMode && (
               <div>
                 {isLoadingStudents || isLoadingGrades ? (
@@ -388,7 +388,7 @@ const GradesModal = ({ isOpen, onClose, classData }: GradesModalProps) => {
                   <div className="space-y-4">
                     {students.map((student: Student) => {
                       const grade = grades.get(student.id);
-                      
+
                       return (
                         <div key={student.id} className="p-4 border rounded-lg">
                           <div className="flex justify-between mb-3">
@@ -410,7 +410,7 @@ const GradesModal = ({ isOpen, onClose, classData }: GradesModalProps) => {
                               <span className="text-sm text-gray-500">/ {getCurrentAssessment()?.maxScore || 100}</span>
                             </div>
                           </div>
-                          
+
                           <Textarea
                             placeholder="Add feedback (optional)"
                             value={grade?.comment || ""}
@@ -420,7 +420,7 @@ const GradesModal = ({ isOpen, onClose, classData }: GradesModalProps) => {
                         </div>
                       );
                     })}
-                    
+
                     <div className="flex justify-end mt-4">
                       <Button
                         onClick={handleSaveGrades}
@@ -434,7 +434,7 @@ const GradesModal = ({ isOpen, onClose, classData }: GradesModalProps) => {
               </div>
             )}
           </TabsContent>
-          
+
           <TabsContent value="view-summary">
             {isLoadingStudents || isLoadingAssessments ? (
               <div className="text-center py-8">Loading grade data...</div>
@@ -491,7 +491,7 @@ const GradesModal = ({ isOpen, onClose, classData }: GradesModalProps) => {
             )}
           </TabsContent>
         </Tabs>
-        
+
         <DialogFooter className="mt-6">
           <Button 
             variant="outline" 
