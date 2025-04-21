@@ -44,13 +44,7 @@ const Header = () => {
             </Button>
           </div>
         ) : (
-          <Button 
-            variant="secondary" 
-            className="text-primary"
-            onClick={() => setLocation("/")}
-          >
-            Login
-          </Button>
+          <></> //Removed Login Button
         )}
       </div>
     </header>

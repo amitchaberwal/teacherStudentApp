@@ -147,17 +147,19 @@ const StudentDashboard = () => {
                         </Button>
                         <div>
                           <Button 
-                            variant="ghost" 
-                            className="text-accent mr-2"
+                            variant="outline" 
+                            className="bg-blue-50 hover:bg-blue-100 text-blue-600 mr-2"
                             onClick={() => handleAttendanceClick(classItem)}
                           >
+                            <CalendarIcon className="h-4 w-4 mr-1" />
                             Attendance
                           </Button>
                           <Button 
-                            variant="ghost" 
-                            className="text-secondary"
+                            variant="outline"
+                            className="bg-green-50 hover:bg-green-100 text-green-600"
                             onClick={() => handleGradesClick(classItem)}
                           >
+                            <GraduationCap className="h-4 w-4 mr-1" />
                             Grades
                           </Button>
                         </div>

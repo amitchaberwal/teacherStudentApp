@@ -169,7 +169,14 @@ export class Storage {
 
       // Get attendance for each class
       const attendancePromises = classes.map(async (classItem) => {
-        const records = await this.getAttendanceByStudent(studentId, classItem.id);
+        const records = await db.select()
+          .from(schema.attendance)
+          .where(and(
+            eq(schema.attendance.studentId, studentId),
+            eq(schema.attendance.classId, classItem.id)
+          ))
+          .all();
+        
         const present = records.filter(r => r.status === 'present').length;
         return records.length > 0 ? Math.round((present / records.length) * 100) : 0;
       });
@@ -177,9 +184,22 @@ export class Storage {
 
       // Get grades for each class
       const gradesPromises = classes.map(async (classItem) => {
-        const grades = await this.getGradesByStudent(studentId, classItem.id);
+        const records = await db.select({
+          assessments: schema.assessments,
+          grades: schema.grades
+        })
+        .from(schema.assessments)
+        .leftJoin(schema.grades, and(
+          eq(schema.grades.assessmentId, schema.assessments.id),
+          eq(schema.grades.studentId, studentId)
+        ))
+        .where(eq(schema.assessments.classId, classItem.id))
+        .all();
+
+        if (!records.length) return 'N/A';
+        const grades = records.filter(r => r.grades?.score != null);
         if (!grades.length) return 'N/A';
-        const avg = grades.reduce((sum, g) => sum + g.score, 0) / grades.length;
+        const avg = grades.reduce((sum, g) => sum + (g.grades?.score || 0), 0) / grades.length;
         return avg.toFixed(1);
       });
       const gradeAverages = await Promise.all(gradesPromises);

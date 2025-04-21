@@ -2,7 +2,7 @@ import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "../../hooks/use-auth";
 import { useLocation } from "wouter";
-import { Copy, MoreVertical, Plus, Search, Users, Edit, Trash, AlertCircle } from "lucide-react";
+import { Copy, MoreVertical, Plus, Search, Users, Edit, Trash, AlertCircle, Calendar, GraduationCap } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -139,13 +139,13 @@ const TeacherDashboard = () => {
           <h2 className="text-2xl font-medium mb-2">Teacher Dashboard</h2>
           <p className="text-gray-600">Manage your classes, attendance and grades</p>
         </div>
-        
+
         <Tabs defaultValue="classes" value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="mb-6 border-b border-gray-200 w-full justify-start">
             <TabsTrigger value="classes">My Classes</TabsTrigger>
             <TabsTrigger value="create-class">Create Class</TabsTrigger>
           </TabsList>
-          
+
           <TabsContent value="classes">
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-xl font-medium">My Classes</h3>
@@ -165,7 +165,7 @@ const TeacherDashboard = () => {
                 </Button>
               </div>
             </div>
-            
+
             {isLoading ? (
               <div className="text-center py-10">Loading classes...</div>
             ) : error ? (
@@ -225,17 +225,19 @@ const TeacherDashboard = () => {
                         </Button>
                         <div>
                           <Button 
-                            variant="ghost" 
-                            className="text-accent mr-2"
+                            variant="outline"
+                            className="bg-blue-50 hover:bg-blue-100 text-blue-600 mr-2"
                             onClick={() => handleAttendanceClick(classItem)}
                           >
+                            <Calendar className="h-4 w-4 mr-1" />
                             Attendance
                           </Button>
                           <Button 
-                            variant="ghost" 
-                            className="text-secondary"
+                            variant="outline"
+                            className="bg-green-50 hover:bg-green-100 text-green-600"
                             onClick={() => handleGradesClick(classItem)}
                           >
+                            <GraduationCap className="h-4 w-4 mr-1" />
                             Grades
                           </Button>
                         </div>
@@ -243,7 +245,7 @@ const TeacherDashboard = () => {
                     </CardContent>
                   </Card>
                 ))}
-                
+
                 {/* Add Class Card */}
                 <Card className="border-dashed border-2 border-gray-300 hover:shadow-lg transition-shadow">
                   <CardContent className="flex flex-col items-center justify-center min-h-[16rem] p-6">
@@ -257,7 +259,7 @@ const TeacherDashboard = () => {
               </div>
             )}
           </TabsContent>
-          
+
           <TabsContent value="create-class">
             <CreateClass onSuccess={() => setActiveTab("classes")} />
           </TabsContent>
@@ -271,7 +273,7 @@ const TeacherDashboard = () => {
             onClose={() => setIsAttendanceModalOpen(false)} 
             classData={selectedClass} 
           />
-          
+
           <GradesModal 
             isOpen={isGradesModalOpen} 
             onClose={() => setIsGradesModalOpen(false)} 
@@ -279,7 +281,7 @@ const TeacherDashboard = () => {
           />
         </>
       )}
-      
+
       {/* Delete class confirmation dialog */}
       <AlertDialog open={isDeleteAlertOpen} onOpenChange={setIsDeleteAlertOpen}>
         <AlertDialogContent>
@@ -315,7 +317,7 @@ const TeacherDashboard = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-      
+
       {/* Edit Class Modal */}
       {classToEdit && (
         <EditClassModal 
