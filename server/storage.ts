@@ -144,22 +144,29 @@ export class Storage {
         .where(eq(schema.enrollments.studentId, studentId))
         .all();
 
+      if (!enrollments || enrollments.length === 0) {
+        return [];
+      }
+
       // Get class details for each enrollment
       const classIds = enrollments.map(enrollment => enrollment.classId);
-      if (classIds.length === 0) return [];
-
       const classes = await db.select()
         .from(schema.classes)
         .where(inArray(schema.classes.id, classIds))
         .all();
 
+      if (!classes || classes.length === 0) {
+        return [];
+      }
+
       // Get teacher details for each class
-      const teacherIds = classes.map(c => c.teacherId);
+      const teacherIds = Array.from(new Set(classes.map(c => c.teacherId)));
       const teachers = await db.select()
         .from(schema.users)
         .where(inArray(schema.users.id, teacherIds))
         .all();
 
+      // Map class data with teacher names
       return classes.map(c => ({
         ...c,
         teacher: teachers.find(t => t.id === c.teacherId)?.name || 'Unknown'
@@ -193,9 +200,22 @@ export class Storage {
   }
 
   async getGradesByStudent(studentId: number, classId: number) {
-    const assessments = await this.getAssessmentsByClass(classId);
-    const assessmentIds = assessments.map(assessment => assessment.id);
-    return await db.select().from(schema.grades).where(inArray(schema.grades.assessmentId, assessmentIds));
+    try {
+      const assessments = await this.getAssessmentsByClass(classId);
+      const assessmentIds = assessments.map(assessment => assessment.id);
+      if (assessmentIds.length === 0) return [];
+      
+      return await db.select()
+        .from(schema.grades)
+        .where(and(
+          eq(schema.grades.studentId, studentId),
+          inArray(schema.grades.assessmentId, assessmentIds)
+        ))
+        .all();
+    } catch (error) {
+      console.error('Error getting grades:', error);
+      return [];
+    }
   }
 
   async getClassByCode(classCode: string) {
