@@ -174,12 +174,16 @@ export class Storage {
     return await db.select().from(schema.grades).where(inArray(schema.grades.assessmentId, assessmentIds));
   }
 
-  async updateGrade(id: number, gradeData: Partial<schema.InsertGrade>) {
-    return await db.update(schema.grades)
-      .set(gradeData)
-      .where(eq(schema.grades.id, id))
-      .returning()
-      .get();
+  async getClassByCode(classCode: string) {
+    try {
+      return await db.select()
+        .from(schema.classes)
+        .where(eq(schema.classes.classCode, classCode))
+        .get();
+    } catch (error) {
+      console.error('Error getting class by code:', error);
+      return null;
+    }
   }
 
   async createAttendance(attendanceData: schema.InsertAttendance) {
