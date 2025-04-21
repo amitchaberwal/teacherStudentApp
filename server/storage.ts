@@ -125,6 +125,18 @@ export class Storage {
     return await db.insert(schema.enrollments).values(enrollmentData).returning().get();
   }
 
+  async getUser(id: number) {
+    try {
+      return await db.select()
+        .from(schema.users)
+        .where(eq(schema.users.id, id))
+        .get();
+    } catch (error) {
+      console.error('Error getting user:', error);
+      return null;
+    }
+  }
+
   async getEnrollmentsByStudent(studentId: number) {
     try {
       const enrollments = await db.select()
@@ -132,14 +144,26 @@ export class Storage {
         .where(eq(schema.enrollments.studentId, studentId))
         .all();
 
-      // Fetch associated class details for each enrollment
+      // Get class details for each enrollment
       const classIds = enrollments.map(enrollment => enrollment.classId);
+      if (classIds.length === 0) return [];
+
       const classes = await db.select()
         .from(schema.classes)
         .where(inArray(schema.classes.id, classIds))
         .all();
 
-      return classes;
+      // Get teacher details for each class
+      const teacherIds = classes.map(c => c.teacherId);
+      const teachers = await db.select()
+        .from(schema.users)
+        .where(inArray(schema.users.id, teacherIds))
+        .all();
+
+      return classes.map(c => ({
+        ...c,
+        teacher: teachers.find(t => t.id === c.teacherId)?.name || 'Unknown'
+      }));
     } catch (error) {
       console.error('Error getting enrollments:', error);
       return [];
