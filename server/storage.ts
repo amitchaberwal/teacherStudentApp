@@ -125,8 +125,25 @@ export class Storage {
     return await db.insert(schema.enrollments).values(enrollmentData).returning().get();
   }
 
-  async getEnrollments(studentId: number) {
-    return await db.select().from(schema.enrollments).where(eq(schema.enrollments.studentId, studentId));
+  async getEnrollmentsByStudent(studentId: number) {
+    try {
+      const enrollments = await db.select()
+        .from(schema.enrollments)
+        .where(eq(schema.enrollments.studentId, studentId))
+        .all();
+
+      // Fetch associated class details for each enrollment
+      const classIds = enrollments.map(enrollment => enrollment.classId);
+      const classes = await db.select()
+        .from(schema.classes)
+        .where(inArray(schema.classes.id, classIds))
+        .all();
+
+      return classes;
+    } catch (error) {
+      console.error('Error getting enrollments:', error);
+      return [];
+    }
   }
 
   async getStudentsByClass(classId: number) {
