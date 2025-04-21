@@ -1,55 +1,55 @@
-import { pgTable, serial, text, varchar, timestamp } from 'drizzle-orm/pg-core';
+import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-export const users = pgTable('users', {
-  id: serial('id').primaryKey(),
-  username: varchar('username', { length: 100 }).unique().notNull(),
-  password: varchar('password', { length: 100 }).notNull(),
-  role: varchar('role', { length: 20 }).notNull(),
-  name: varchar('name', { length: 100 }).notNull()
+export const users = sqliteTable('users', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  username: text('username').unique().notNull(),
+  password: text('password').notNull(),
+  role: text('role').notNull(),
+  name: text('name').notNull()
 });
 
-export const classes = pgTable('classes', {
-  id: serial('id').primaryKey(),
-  name: varchar('name', { length: 100 }).notNull(),
-  subject: varchar('subject', { length: 50 }).notNull(),
+export const classes = sqliteTable('classes', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  name: text('name').notNull(),
+  subject: text('subject').notNull(),
   description: text('description'),
-  gradeLevel: varchar('grade_level', { length: 20 }).notNull(),
-  classCode: varchar('class_code', { length: 20 }).unique().notNull(),
-  teacherId: serial('teacher_id').references(() => users.id).notNull(),
-  createdAt: timestamp('created_at').defaultNow()
+  gradeLevel: text('grade_level').notNull(),
+  classCode: text('class_code').unique().notNull(),
+  teacherId: integer('teacher_id').references(() => users.id).notNull(),
+  createdAt: text('created_at').default(String(new Date().toISOString()))
 });
 
-export const enrollments = pgTable('enrollments', {
-  id: serial('id').primaryKey(),
-  studentId: serial('student_id').references(() => users.id).notNull(),
-  classId: serial('class_id').references(() => classes.id).notNull(),
-  enrolledAt: timestamp('enrolled_at').defaultNow()
+export const enrollments = sqliteTable('enrollments', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  studentId: integer('student_id').references(() => users.id).notNull(),
+  classId: integer('class_id').references(() => classes.id).notNull(),
+  enrolledAt: text('enrolled_at').default(String(new Date().toISOString()))
 });
 
-export const attendance = pgTable('attendance', {
-  id: serial('id').primaryKey(),
-  studentId: serial('student_id').references(() => users.id).notNull(),
-  classId: serial('class_id').references(() => classes.id).notNull(),
-  status: varchar('status', { length: 20 }).notNull(),
-  date: timestamp('date').defaultNow()
+export const attendance = sqliteTable('attendance', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  studentId: integer('student_id').references(() => users.id).notNull(),
+  classId: integer('class_id').references(() => classes.id).notNull(),
+  status: text('status').notNull(),
+  date: text('date').default(String(new Date().toISOString()))
 });
 
-export const assessments = pgTable('assessments', {
-  id: serial('id').primaryKey(),
-  classId: serial('class_id').references(() => classes.id).notNull(),
-  name: varchar('name', { length: 100 }).notNull(),
-  createdAt: timestamp('created_at').defaultNow()
+export const assessments = sqliteTable('assessments', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  classId: integer('class_id').references(() => classes.id).notNull(),
+  name: text('name').notNull(),
+  createdAt: text('created_at').default(String(new Date().toISOString()))
 });
 
-export const grades = pgTable('grades', {
-  id: serial('id').primaryKey(),
-  studentId: serial('student_id').references(() => users.id).notNull(),
-  assessmentId: serial('assessment_id').references(() => assessments.id).notNull(),
-  score: serial('score').notNull(),
+export const grades = sqliteTable('grades', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  studentId: integer('student_id').references(() => users.id).notNull(),
+  assessmentId: integer('assessment_id').references(() => assessments.id).notNull(),
+  score: integer('score').notNull(),
   comment: text('comment'),
-  updatedAt: timestamp('updated_at').defaultNow()
+  updatedAt: text('updated_at').default(String(new Date().toISOString()))
 });
 
 // Insert schemas
