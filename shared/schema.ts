@@ -1,68 +1,55 @@
-import { pgTable, text, serial, integer, boolean, timestamp, primaryKey } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, varchar, timestamp } from 'drizzle-orm/pg-core';
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-export const users = pgTable("users", {
-  id: serial("id").primaryKey(),
-  username: text("username").notNull().unique(),
-  password: text("password").notNull(),
-  role: text("role", { enum: ["teacher", "student"] }).notNull(),
-  name: text("name").notNull(),
+export const users = pgTable('users', {
+  id: serial('id').primaryKey(),
+  username: varchar('username', { length: 100 }).unique().notNull(),
+  password: varchar('password', { length: 100 }).notNull(),
+  role: varchar('role', { length: 20 }).notNull(),
+  name: varchar('name', { length: 100 }).notNull()
 });
 
-export const classes = pgTable("classes", {
-  id: serial("id").primaryKey(),
-  name: text("name").notNull(),
-  subject: text("subject").notNull(),
-  description: text("description"),
-  gradeLevel: text("grade_level").notNull(),
-  classCode: text("class_code").notNull().unique(),
-  teacherId: integer("teacher_id").notNull().references(() => users.id),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
+export const classes = pgTable('classes', {
+  id: serial('id').primaryKey(),
+  name: varchar('name', { length: 100 }).notNull(),
+  subject: varchar('subject', { length: 50 }).notNull(),
+  description: text('description'),
+  gradeLevel: varchar('grade_level', { length: 20 }).notNull(),
+  classCode: varchar('class_code', { length: 20 }).unique().notNull(),
+  teacherId: serial('teacher_id').references(() => users.id).notNull(),
+  createdAt: timestamp('created_at').defaultNow()
 });
 
-export const enrollments = pgTable("enrollments", {
-  id: serial("id").primaryKey(),
-  studentId: integer("student_id").notNull().references(() => users.id),
-  classId: integer("class_id").notNull().references(() => classes.id),
-  enrolledAt: timestamp("enrolled_at").defaultNow().notNull(),
-}, (table) => {
-  return {
-    studentClassUnique: primaryKey({ columns: [table.studentId, table.classId] }),
-  };
+export const enrollments = pgTable('enrollments', {
+  id: serial('id').primaryKey(),
+  studentId: serial('student_id').references(() => users.id).notNull(),
+  classId: serial('class_id').references(() => classes.id).notNull(),
+  enrolledAt: timestamp('enrolled_at').defaultNow()
 });
 
-export const attendance = pgTable("attendance", {
-  id: serial("id").primaryKey(),
-  classId: integer("class_id").notNull().references(() => classes.id),
-  studentId: integer("student_id").notNull().references(() => users.id),
-  date: timestamp("date").notNull(),
-  status: text("status", { enum: ["present", "absent", "late", "excused"] }).notNull(),
-  comment: text("comment"),
-}, (table) => {
-  return {
-    attendanceUnique: primaryKey({ columns: [table.classId, table.studentId, table.date] }),
-  };
+export const attendance = pgTable('attendance', {
+  id: serial('id').primaryKey(),
+  studentId: serial('student_id').references(() => users.id).notNull(),
+  classId: serial('class_id').references(() => classes.id).notNull(),
+  status: varchar('status', { length: 20 }).notNull(),
+  date: timestamp('date').defaultNow()
 });
 
-export const assessments = pgTable("assessments", {
-  id: serial("id").primaryKey(),
-  classId: integer("class_id").notNull().references(() => classes.id),
-  name: text("name").notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
+export const assessments = pgTable('assessments', {
+  id: serial('id').primaryKey(),
+  classId: serial('class_id').references(() => classes.id).notNull(),
+  name: varchar('name', { length: 100 }).notNull(),
+  createdAt: timestamp('created_at').defaultNow()
 });
 
-export const grades = pgTable("grades", {
-  id: serial("id").primaryKey(),
-  assessmentId: integer("assessment_id").notNull().references(() => assessments.id),
-  studentId: integer("student_id").notNull().references(() => users.id),
-  score: integer("score").notNull(),
-  comment: text("comment"),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-}, (table) => {
-  return {
-    gradeUnique: primaryKey({ columns: [table.assessmentId, table.studentId] }),
-  };
+export const grades = pgTable('grades', {
+  id: serial('id').primaryKey(),
+  studentId: serial('student_id').references(() => users.id).notNull(),
+  assessmentId: serial('assessment_id').references(() => assessments.id).notNull(),
+  score: serial('score').notNull(),
+  comment: text('comment'),
+  updatedAt: timestamp('updated_at').defaultNow()
 });
 
 // Insert schemas
