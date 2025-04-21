@@ -203,33 +203,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'Student ID is required' });
       }
       
-      const enrollments = await storage.getEnrollmentsByStudent(studentId);
+      const classes = await storage.getEnrollmentsByStudent(studentId);
+      if (!classes) {
+        return res.status(200).json([]);
+      }
       
-      // Get class details for each enrollment
-      const enrolledClasses = await Promise.all(
-        enrollments.map(async (enrollment) => {
-          const classRecord = await storage.getClass(enrollment.classId);
-          if (!classRecord) return null;
-          
-          // Get teacher details
-          const teacher = await storage.getUser(classRecord.teacherId);
-          
-          // Get attendance stats
-          const attendanceRecords = await storage.getAttendanceByStudent(studentId, classRecord.id);
-          const totalRecords = attendanceRecords.length;
-          let presentCount = 0;
-          
-          attendanceRecords.forEach(record => {
-            if (record.status === 'present') presentCount++;
-          });
-          
-          const attendanceRate = totalRecords > 0 ? Math.round((presentCount / totalRecords) * 100) : 0;
-          
-          // Get grades
-          const grades = await storage.getGradesByStudent(studentId, classRecord.id);
-          let totalScore = 0;
-          grades.forEach(grade => totalScore += grade.score);
-          const averageGrade = grades.length > 0 ? (totalScore / grades.length).toFixed(1) : 'N/A';
+      // Return the classes directly since getEnrollmentsByStudent now handles all the data processing
+      return res.status(200).json(classes);
           
           return {
             ...classRecord,

@@ -139,42 +139,58 @@ export class Storage {
 
   async getEnrollmentsByStudent(studentId: number) {
     try {
+      // Get enrollments
       const enrollments = await db.select()
         .from(schema.enrollments)
         .where(eq(schema.enrollments.studentId, studentId))
         .all();
 
-      if (!enrollments || enrollments.length === 0) {
+      if (!enrollments?.length) {
         return [];
       }
 
-      const classIds = enrollments.map(enrollment => enrollment.classId);
+      // Get classes
+      const classIds = enrollments.map(e => e.classId);
       const classes = await db.select()
         .from(schema.classes)
         .where(inArray(schema.classes.id, classIds))
         .all();
 
-      if (!classes || classes.length === 0) {
+      if (!classes?.length) {
         return [];
       }
 
+      // Get teachers
       const teacherIds = classes.map(c => c.teacherId);
-      if (teacherIds.length === 0) return classes;
-
       const teachers = await db.select()
         .from(schema.users)
         .where(inArray(schema.users.id, teacherIds))
-        .all();
+        .all() || [];
 
-      return classes.map(classItem => {
-        const teacher = teachers.find(t => t.id === classItem.teacherId);
-        return {
-          ...classItem,
-          teacher: teacher ? teacher.name : 'Unknown',
-          attendance: '0%',
-          grade: 'N/A'
-        };
+      // Get attendance for each class
+      const attendancePromises = classes.map(async (classItem) => {
+        const records = await this.getAttendanceByStudent(studentId, classItem.id);
+        const present = records.filter(r => r.status === 'present').length;
+        return records.length > 0 ? Math.round((present / records.length) * 100) : 0;
       });
+      const attendanceRates = await Promise.all(attendancePromises);
+
+      // Get grades for each class
+      const gradesPromises = classes.map(async (classItem) => {
+        const grades = await this.getGradesByStudent(studentId, classItem.id);
+        if (!grades.length) return 'N/A';
+        const avg = grades.reduce((sum, g) => sum + g.score, 0) / grades.length;
+        return avg.toFixed(1);
+      });
+      const gradeAverages = await Promise.all(gradesPromises);
+
+      // Combine all data
+      return classes.map((classItem, index) => ({
+        ...classItem,
+        teacher: teachers.find(t => t.id === classItem.teacherId)?.name || 'Unknown',
+        attendance: `${attendanceRates[index]}%`,
+        grade: gradeAverages[index]
+      }));
     } catch (error) {
       console.error('Error getting enrollments:', error);
       return [];
