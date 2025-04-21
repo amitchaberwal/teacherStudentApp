@@ -69,13 +69,23 @@ sqlite.exec(`
 
 export class Storage {
   async createUser(userData: schema.InsertUser) {
-    const [user] = await db.insert(schema.users).values(userData).returning();
-    return user;
+    try {
+      const result = await db.insert(schema.users).values(userData).returning().get();
+      return result;
+    } catch (error) {
+      console.error('Error creating user:', error);
+      throw error;
+    }
   }
 
-  async getUser(username: string) {
-    const [user] = await db.select().from(schema.users).where(eq(schema.users.username, username));
-    return user;
+  async getUserByUsername(username: string) {
+    try {
+      const result = await db.select().from(schema.users).where(eq(schema.users.username, username)).get();
+      return result;
+    } catch (error) {
+      console.error('Error getting user:', error);
+      return null;
+    }
   }
 
   async getUserById(id: number) {
