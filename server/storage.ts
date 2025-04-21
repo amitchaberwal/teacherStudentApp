@@ -148,7 +148,6 @@ export class Storage {
         return [];
       }
 
-      // Get class details for each enrollment
       const classIds = enrollments.map(enrollment => enrollment.classId);
       const classes = await db.select()
         .from(schema.classes)
@@ -159,18 +158,23 @@ export class Storage {
         return [];
       }
 
-      // Get teacher details for each class
-      const teacherIds = Array.from(new Set(classes.map(c => c.teacherId)));
+      const teacherIds = classes.map(c => c.teacherId);
+      if (teacherIds.length === 0) return classes;
+
       const teachers = await db.select()
         .from(schema.users)
         .where(inArray(schema.users.id, teacherIds))
         .all();
 
-      // Map class data with teacher names
-      return classes.map(c => ({
-        ...c,
-        teacher: teachers.find(t => t.id === c.teacherId)?.name || 'Unknown'
-      }));
+      return classes.map(classItem => {
+        const teacher = teachers.find(t => t.id === classItem.teacherId);
+        return {
+          ...classItem,
+          teacher: teacher ? teacher.name : 'Unknown',
+          attendance: '0%',
+          grade: 'N/A'
+        };
+      });
     } catch (error) {
       console.error('Error getting enrollments:', error);
       return [];
