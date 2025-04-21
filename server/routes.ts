@@ -268,7 +268,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Create enrollment
-      const enrollment = await storage.enrollStudent({
+      const enrollment = await storage.createEnrollment({
         studentId,
         classId: classRecord.id
       });
